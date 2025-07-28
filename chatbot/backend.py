@@ -1,0 +1,61 @@
+import json
+
+import httpx
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Message(BaseModel):
+    message: str
+
+@app.post("/assist")
+async def assist_endpoint(request: Message):
+
+    """
+    API endpoint for the response
+    :param request: request object containing user text
+    :return: text from Ollama
+    """
+
+    text = request.message
+    response = await assist_report(text)
+
+    return {"response": response}
+
+async def query_ollama(prompt: str) -> str:
+
+    """
+    Query the Ollama API
+    :param prompt: prompt
+    :return: response from Ollama
+    """
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3",
+                "prompt": prompt,
+                "stream": False
+            },
+            timeout=90
+        )
+        try:
+            data = json.loads(response.text)
+            return data["response"]
+        except json.JSONDecodeError as e:
+            return f"Error decoding JSON: {e}\nRaw response: {response.text}"
+
+
+async def assist_report(text: str) -> str:
+
+    """
+    Assist report
+    :param text: text to be corrected
+    :return: revised text
+    """
+
+    prompt = (f"QUICK RESPONSE TO MY CHAT: {text}")
+    response = await query_ollama(prompt)
+    return response
